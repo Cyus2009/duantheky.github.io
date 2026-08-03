@@ -1,15 +1,105 @@
-// --- QUẢN LÝ TAB ---
+// ==========================================
+// HỆ THỐNG DỮ LIỆU LOCALSTORAGE
+// ==========================================
+let studyData = JSON.parse(localStorage.getItem('tanock_study_data')) || {};
+let subjects = JSON.parse(localStorage.getItem('tanock_subjects')) || ['C++ (Thuật toán)', 'Python', 'Toán', 'Tiếng Anh'];
+let savedTheme = localStorage.getItem('tanock_theme') || 'cyberpunk';
+let pieChartInstance = null;
+
+// Template mặc định tối ưu cho Thuật Toán
+const defaultCPPTemplate = `#include <bits/stdc++.h>
+#define ll long long
+using namespace std;
+
+const int MAXN = 1e5 + 5;
+int a[MAXN]; // Mảng tĩnh
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    
+    cout << "Ready to Code!" << "\\n";
+    
+    return 0;
+}`;
+
+// ==========================================
+// GIAO DIỆN & TÙY CHỈNH THEME
+// ==========================================
+function loadTheme() {
+    document.getElementById('theme-select').value = savedTheme;
+    changeTheme();
+}
+
+function changeTheme() {
+    const theme = document.getElementById('theme-select').value;
+    document.body.className = `theme-${theme}`;
+    localStorage.setItem('tanock_theme', theme);
+    if (window.monaco) monaco.editor.setTheme(theme === 'light' ? 'vs' : 'vs-dark');
+}
+
 function switchTab(tabId) {
     document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     event.currentTarget.classList.add('active');
+    if(tabId === 'dashboard') updateDashboard();
 }
 
-// --- QUẢN LÝ TIMER & MÔN HỌC ---
+// ==========================================
+// TRÌNH PHÁT NHẠC (YOUTUBE & MP3)
+// ==========================================
+function initMusic() {
+    const savedMusic = localStorage.getItem('tanock_music');
+    if (savedMusic) {
+        document.getElementById('music-url').value = savedMusic;
+        loadMusic(false); 
+    }
+}
+
+function loadMusic(autoplay = true) {
+    const url = document.getElementById('music-url').value.trim();
+    const container = document.getElementById('player-container');
+    if (!url) return;
+
+    localStorage.setItem('tanock_music', url);
+    let auto = autoplay ? 'autoplay=1&' : '';
+
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let videoId = '';
+        if (url.includes('v=')) videoId = url.split('v=')[1].substring(0, 11);
+        else if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1].substring(0, 11);
+
+        if (videoId) {
+            container.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?${auto}loop=1&playlist=${videoId}" frameborder="0" allow="autoplay; encrypted-media"></iframe>`;
+        }
+    } else {
+        container.innerHTML = `<audio id="bg-music" loop controls ${autoplay ? 'autoplay' : ''} src="${url}"></audio>`;
+    }
+}
+
+// ==========================================
+// TIMER & QUẢN LÝ MÔN HỌC
+// ==========================================
 let timerInterval;
 let seconds = 0;
 let isRunning = false;
+
+function loadSubjects() {
+    const select = document.getElementById('subject-select');
+    select.innerHTML = '';
+    subjects.forEach(sub => { select.add(new Option(sub, sub)); });
+}
+
+function addSubject() {
+    const newSub = document.getElementById('new-subject').value.trim();
+    if (newSub !== '' && !subjects.includes(newSub)) {
+        subjects.push(newSub);
+        localStorage.setItem('tanock_subjects', JSON.stringify(subjects));
+        loadSubjects();
+        document.getElementById('new-subject').value = '';
+    }
+}
 
 function updateTimeDisplay() {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -32,161 +122,151 @@ function pauseTimer() {
 
 function stopTimer() {
     pauseTimer();
-    const subject = document.getElementById('subject-select').value;
-    alert(`Đã lưu ${Math.floor(seconds/60)} phút học môn: ${subject} vào thống kê!`);
-    seconds = 0;
-    updateTimeDisplay();
-    // Ở phiên bản thực tế, bạn sẽ push dữ liệu này vào mảng và gọi updateCharts()
-}
-
-function addSubject() {
-    const newSub = document.getElementById('new-subject').value;
-    if (newSub.trim() !== '') {
-        const select = document.getElementById('subject-select');
-        const option = document.createElement('option');
-        option.value = newSub; option.text = newSub;
-        select.add(option);
-        document.getElementById('new-subject').value = '';
-        select.value = newSub;
+    if (seconds < 60) {
+        alert("Thời gian học dưới 1 phút sẽ không được lưu.");
+        seconds = 0; updateTimeDisplay(); return;
     }
+    const subject = document.getElementById('subject-select').value;
+    const minutesStudied = Math.floor(seconds / 60);
+    
+    if (!studyData[subject]) studyData[subject] = 0;
+    studyData[subject] += minutesStudied;
+    localStorage.setItem('tanock_study_data', JSON.stringify(studyData));
+    
+    alert(`Đã lưu ${minutesStudied} phút cho môn ${subject}.`);
+    seconds = 0; updateTimeDisplay(); updateDashboard(); 
 }
 
-// --- KHỞI TẠO BIỂU ĐỒ (CHART.JS) ---
-// Fake Data để minh họa đẹp mắt
-Chart.defaults.color = '#94a3b8';
-Chart.defaults.font.family = "'Inter', sans-serif";
+// ==========================================
+// THỐNG KÊ (CHART.JS)
+// ==========================================
+function updateDashboard() {
+    Chart.defaults.color = savedTheme === 'light' ? '#64748b' : '#94a3b8';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    
+    const labels = Object.keys(studyData);
+    const dataVals = Object.values(studyData);
+    const totalMinutes = dataVals.reduce((a, b) => a + b, 0);
+    document.getElementById('total-time-display').innerText = `${totalMinutes} Phút`;
 
-const commonOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } };
+    if (labels.length === 0) return; 
 
-// 1. Biểu đồ Tuần (Bar)
-new Chart(document.getElementById('weeklyChart'), {
-    type: 'bar',
-    data: {
-        labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
-        datasets: [{ label: 'Giờ học tuần này', data: [3, 4.5, 2, 6, 4, 7, 5], backgroundColor: '#00f0ff', borderRadius: 6 }]
-    },
-    options: commonOptions
-});
+    const ctx = document.getElementById('subjectPieChart');
+    const colors = ['#00f0ff', '#b026ff', '#ff0055', '#ffaa00', '#00ff00', '#ffff00'];
 
-// 2. Biểu đồ Tháng (Line)
-new Chart(document.getElementById('monthlyChart'), {
-    type: 'line',
-    data: {
-        labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4'],
-        datasets: [{ label: 'Xu hướng tháng', data: [15, 22, 18, 26], borderColor: '#b026ff', tension: 0.4, fill: true, backgroundColor: 'rgba(176, 38, 255, 0.1)' }]
-    },
-    options: commonOptions
-});
+    if (pieChartInstance) pieChartInstance.destroy(); 
+    pieChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: labels, datasets: [{ data: dataVals, backgroundColor: colors, borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right' } } }
+    });
+}
 
-// 3. Biểu đồ Phân bổ Môn học (Doughnut)
-new Chart(document.getElementById('subjectPieChart'), {
-    type: 'doughnut',
-    data: {
-        labels: ['C++ (Thuật toán)', 'Toán', 'IELTS', 'Hóa'],
-        datasets: [{ data: [40, 20, 25, 15], backgroundColor: ['#00f0ff', '#b026ff', '#ff0055', '#ffaa00'], borderWidth: 0 }]
-    },
-    options: { ...commonOptions, cutout: '70%' }
-});
-
-// --- CẤU HÌNH MONACO EDITOR ---
+// ==========================================
+// CODE EDITOR (MONACO) & AUTO-SAVE
+// ==========================================
 let algoEditor, htmlEditor, cssEditor, jsEditor;
-
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs' }});
 require(['vs/editor/editor.main'], function() {
-    
-    // Editor cho C++/Python
+    const editorTheme = savedTheme === 'light' ? 'vs' : 'vs-dark';
+
+    const savedAlgo = localStorage.getItem('tanock_algo_code') || defaultCPPTemplate;
     algoEditor = monaco.editor.create(document.getElementById('algo-editor'), {
-        value: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << "Hello TANOCK!" << endl;\n    return 0;\n}',
-        language: 'cpp',
-        theme: 'vs-dark',
-        automaticLayout: true,
-        minimap: { enabled: false },
-        fontSize: 16,
-        fontFamily: "'Fira Code', monospace"
+        value: savedAlgo, language: 'cpp', theme: editorTheme, automaticLayout: true, minimap: { enabled: false }, fontSize: 16
     });
 
-    // Sự kiện đổi ngôn ngữ C++ <-> Python
-    document.getElementById('lang-select').addEventListener('change', (e) => {
-        const lang = e.target.value;
-        monaco.editor.setModelLanguage(algoEditor.getModel(), lang);
-        if(lang === 'python') algoEditor.setValue('print("Hello TANOCK from Python!")');
-        else algoEditor.setValue('#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << "Hello TANOCK!" << endl;\n    return 0;\n}');
-    });
-
-    // Editors cho Web Builder
-    const webConfig = { theme: 'vs-dark', automaticLayout: true, minimap: { enabled: false }, fontSize: 14 };
+    algoEditor.onDidChangeModelContent(() => { localStorage.setItem('tanock_algo_code', algoEditor.getValue()); });
     
-    htmlEditor = monaco.editor.create(document.getElementById('html-editor'), { ...webConfig, language: 'html', value: '<h1 class="title">Hello World</h1>' });
-    cssEditor = monaco.editor.create(document.getElementById('css-editor'), { ...webConfig, language: 'css', value: '.title {\n  color: #00f0ff;\n  text-align: center;\n  font-family: sans-serif;\n  margin-top: 20%;\n}' });
-    jsEditor = monaco.editor.create(document.getElementById('js-editor'), { ...webConfig, language: 'javascript', value: 'console.log("Web loaded!");' });
+    // Tự đổi highlight ngôn ngữ theo chuẩn đã chọn
+    document.getElementById('lang-select').addEventListener('change', (e) => {
+        const isCpp = e.target.value.startsWith('cpp');
+        monaco.editor.setModelLanguage(algoEditor.getModel(), isCpp ? 'cpp' : 'python');
+    });
 
-    // Live Preview Auto-update
+    const webConfig = { theme: editorTheme, automaticLayout: true, minimap: { enabled: false }, fontSize: 14 };
+    htmlEditor = monaco.editor.create(document.getElementById('html-editor'), { ...webConfig, language: 'html', value: localStorage.getItem('tanock_html') || '<h1 class="title">Hello World</h1>' });
+    cssEditor = monaco.editor.create(document.getElementById('css-editor'), { ...webConfig, language: 'css', value: localStorage.getItem('tanock_css') || 'body { background: #333; }\n.title { color: #00f0ff; text-align: center; margin-top: 20%; }' });
+    jsEditor = monaco.editor.create(document.getElementById('js-editor'), { ...webConfig, language: 'javascript', value: localStorage.getItem('tanock_js') || 'console.log("Web loaded!");' });
+
     const updatePreview = () => {
-        const html = htmlEditor.getValue();
-        const css = `<style>${cssEditor.getValue()}</style>`;
-        const js = `<script>${jsEditor.getValue()}<\/script>`;
-        const iframe = document.getElementById('live-preview');
-        iframe.srcdoc = `${html}${css}${js}`;
+        const html = htmlEditor.getValue(), css = cssEditor.getValue(), js = jsEditor.getValue();
+        localStorage.setItem('tanock_html', html); localStorage.setItem('tanock_css', css); localStorage.setItem('tanock_js', js);
+        document.getElementById('live-preview').srcdoc = `${html}<style>${css}</style><script>${js}<\/script>`;
     };
-
-    htmlEditor.onDidChangeModelContent(updatePreview);
-    cssEditor.onDidChangeModelContent(updatePreview);
-    jsEditor.onDidChangeModelContent(updatePreview);
-    setTimeout(updatePreview, 500); // Initial load
+    htmlEditor.onDidChangeModelContent(updatePreview); cssEditor.onDidChangeModelContent(updatePreview); jsEditor.onDidChangeModelContent(updatePreview);
+    setTimeout(updatePreview, 500); 
 });
 
-// --- EXECUTE CODE (Piston API cho C++/Python) ---
+// ==========================================
+// THỰC THI CODE & TRUYỀN FLAGS (C++11/14/17/20)
+// ==========================================
 async function runAlgoCode() {
     const code = algoEditor.getValue();
-    const lang = document.getElementById('lang-select').value;
+    const langOption = document.getElementById('lang-select').value;
     const outputBox = document.getElementById('algo-output');
     
-    outputBox.innerText = "Đang biên dịch và chạy trên Cloud...";
+    outputBox.innerText = "Đang kết nối Server biên dịch...\n";
     
-    // Ánh xạ phiên bản cho API
-    const languageMap = { 'cpp': { name: 'c++', version: '10.2.0' }, 'python': { name: 'python', version: '3.10.0' } };
-    const execLang = languageMap[lang];
+    const isCpp = langOption.startsWith('cpp');
+    const languageName = isCpp ? 'c++' : 'python';
+
+    // Tạo gói tin Request
+    let requestBody = { 
+        language: languageName, 
+        version: "*", // Dùng bản mới nhất trên Server
+        files: [{ content: code }] 
+    };
+
+    // Truyền tham số chuẩn C++ vào Compiler 
+    if (isCpp) {
+        const stdVersion = langOption.replace('cpp', 'c++'); // chuyển 'cpp17' thành 'c++17'
+        requestBody.compile_args = [`-std=${stdVersion}`, "-O2"]; // Build với chuẩn C++ và bật cờ tối ưu thuật toán -O2
+    }
 
     try {
         const res = await fetch('https://emkc.org/api/v2/piston/execute', {
-            method: 'POST',
+            method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                language: execLang.name,
-                version: execLang.version,
-                files: [{ content: code }]
-            })
+            body: JSON.stringify(requestBody)
         });
+        
         const data = await res.json();
-        outputBox.innerText = data.run.output || "Chương trình chạy xong nhưng không in ra gì.";
-        if (data.compile && data.compile.stderr) {
-            outputBox.innerText += `\nLỗi Biên Dịch:\n${data.compile.stderr}`;
+        
+        if(data.message) {
+            outputBox.innerText = "Lỗi Server: " + data.message;
+            return;
         }
-    } catch (err) {
-        outputBox.innerText = "Lỗi kết nối tới Server biên dịch.";
+
+        outputBox.innerText = data.run.output || "✅ Chương trình chạy xong (Không có output).";
+        
+        // Nếu có lỗi biên dịch
+        if (data.compile && data.compile.stderr) { 
+            outputBox.innerText += `\n❌ Lỗi Biên Dịch (${langOption.toUpperCase()}):\n${data.compile.stderr}`; 
+        }
+    } catch (err) { 
+        outputBox.innerText = "❌ Lỗi mạng hoặc Server đang bận. Vui lòng thử lại!"; 
     }
 }
 
-// --- TÍNH NĂNG TẢI CODE ---
+// ==========================================
+// TÍNH NĂNG TẢI FILE CODE
+// ==========================================
 function downloadStringAsFile(content, filename) {
     const blob = new Blob([content], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
 }
-
 function downloadCode() {
-    const code = algoEditor.getValue();
-    const lang = document.getElementById('lang-select').value;
-    const ext = lang === 'cpp' ? 'cpp' : 'py';
-    downloadStringAsFile(code, `tanock_solution.${ext}`);
+    const isCpp = document.getElementById('lang-select').value.startsWith('cpp');
+    const ext = isCpp ? 'cpp' : 'py';
+    downloadStringAsFile(algoEditor.getValue(), `tanock_solution.${ext}`);
+}
+function downloadWebCode() {
+    const code = `<!DOCTYPE html>\n<html>\n<head>\n<style>\n${cssEditor.getValue()}\n</style>\n</head>\n<body>\n${htmlEditor.getValue()}\n<script>\n${jsEditor.getValue()}\n<\/script>\n</body>\n</html>`;
+    downloadStringAsFile(code, 'tanock_website.html');
 }
 
-function downloadWebCode() {
-    const html = htmlEditor.getValue();
-    const css = cssEditor.getValue();
-    const js = jsEditor.getValue();
-    const fullSource = `<!DOCTYPE html>\n<html>\n<head>\n<style>\n${css}\n</style>\n</head>\n<body>\n${html}\n<script>\n${js}\n<\/script>\n</body>\n</html>`;
-    downloadStringAsFile(fullSource, 'tanock_website.html');
-}
+// Khởi chạy khi load trang
+loadTheme();
+loadSubjects();
+updateDashboard();
+initMusic();

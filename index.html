@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TANOCK | Study & Code Hub</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-panel-side">
+            <h1 class="logo glow-text">TANOCK<span class="dot">.</span></h1>
+            
+            <div class="theme-selector glass-panel">
+                <label for="theme-select"><i class="fas fa-palette"></i> Giao diện:</label>
+                <select id="theme-select" onchange="changeTheme()">
+                    <option value="cyberpunk">Neon Dark</option>
+                    <option value="light">Minimal Light</option>
+                    <option value="matrix">Matrix Hacker</option>
+                </select>
+            </div>
+
+            <nav>
+                <button class="nav-btn active" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> Thống Kê</button>
+                <button class="nav-btn" onclick="switchTab('timer')"><i class="fas fa-stopwatch"></i> Bấm Giờ & To-Do</button>
+                <button class="nav-btn" onclick="switchTab('notes')"><i class="fas fa-edit"></i> Ghi Chú Nhanh</button>
+                <button class="nav-btn" onclick="switchTab('algorithms')"><i class="fas fa-terminal"></i> Thuật Toán</button>
+                <button class="nav-btn" onclick="switchTab('webdev')"><i class="fas fa-code"></i> Web Builder</button>
+            </nav>
+            
+            <div class="music-player glass-panel">
+                <h4><i class="fas fa-headphones"></i> Trạm Âm Nhạc</h4>
+                <div class="music-controls">
+                    <input type="text" id="music-url" placeholder="Dán link Youtube / MP3...">
+                    <button onclick="loadMusic(true)" class="btn btn-outline" title="Phát nhạc"><i class="fas fa-play"></i></button>
+                </div>
+                <div id="player-container">
+                    <audio id="bg-music" loop controls src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"></audio>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Daily Quote -->
+            <div class="quote-container" id="daily-quote">
+                "Code is like humor. When you have to explain it, it’s bad."
+            </div>
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="dashboard" class="tab-pane active">
+                <header><h2>Dữ Liệu Học Tập</h2></header>
+                <div class="charts-grid">
+                    <div class="chart-container glass-panel">
+                        <h3><i class="fas fa-chart-pie"></i> Phân bổ thời gian</h3>
+                        <canvas id="subjectPieChart"></canvas>
+                    </div>
+                    <div class="chart-container glass-panel stats-box">
+                        <h3><i class="fas fa-trophy"></i> Tổng thời gian cày cuốc</h3>
+                        <h1 id="total-time-display" class="glow-text text-large">0 Phút</h1>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: TIMER & TODO -->
+            <section id="timer" class="tab-pane">
+                <header><h2>Focus Center</h2></header>
+                <div class="focus-layout">
+                    <!-- Timer -->
+                    <div class="timer-wrapper glass-panel">
+                        <h3>Bộ Đếm Thời Gian</h3>
+                        <div class="timer-modes">
+                            <button class="btn btn-outline mode-btn active" onclick="setTimerMode('stopwatch')">Đếm xuôi</button>
+                            <button class="btn btn-outline mode-btn" onclick="setTimerMode('pomodoro')">Pomodoro (25m)</button>
+                        </div>
+                        <div class="subject-selector">
+                            <select id="subject-select"></select>
+                            <input type="text" id="new-subject" placeholder="Thêm môn...">
+                            <button onclick="addSubject()" class="btn btn-outline"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="clock-display glow-text" id="time-display">00:00:00</div>
+                        <div class="controls">
+                            <button onclick="startTimer()" class="btn btn-primary"><i class="fas fa-play"></i> Bắt đầu</button>
+                            <button onclick="pauseTimer()" class="btn btn-warning"><i class="fas fa-pause"></i> Dừng</button>
+                            <button onclick="stopTimer()" class="btn btn-danger"><i class="fas fa-stop"></i> Lưu</button>
+                        </div>
+                    </div>
+
+                    <!-- To-Do List -->
+                    <div class="todo-wrapper glass-panel">
+                        <h3><i class="fas fa-list-check"></i> Nhiệm vụ hôm nay</h3>
+                        <div class="todo-input-group">
+                            <input type="text" id="todo-input" placeholder="VD: Cày xong 5 bài DSU...">
+                            <button onclick="addTodo()" class="btn btn-primary"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <ul id="todo-list" class="todo-list"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: NOTES -->
+            <section id="notes" class="tab-pane">
+                <header class="editor-header">
+                    <h2>Bảng Ghi Chú (Tự Động Lưu)</h2>
+                    <button onclick="clearNotes()" class="btn btn-danger"><i class="fas fa-trash"></i> Xóa hết</button>
+                </header>
+                <textarea id="quick-notes" class="glass-panel notes-area" placeholder="Gõ nháp thuật toán, ý tưởng hoặc copy đề bài vào đây... Mọi thứ được lưu tự động!"></textarea>
+            </section>
+
+            <!-- TAB 4: ALGORITHMS -->
+            <section id="algorithms" class="tab-pane">
+                <header class="editor-header">
+                    <h2>Terminal Sandbox</h2>
+                    <div class="editor-actions">
+                        <select id="lang-select" class="lang-dropdown">
+                            <option value="cpp17">C++17</option>
+                            <option value="cpp14">C++14</option>
+                            <option value="cpp11">C++11</option>
+                            <option value="python">Python 3</option>
+                        </select>
+                        <button onclick="downloadCode()" class="btn btn-outline"><i class="fas fa-download"></i> Tải Code</button>
+                        <button onclick="runAlgoCode()" class="btn btn-primary" id="run-btn"><i class="fas fa-bolt"></i> Run Code</button>
+                    </div>
+                </header>
+                <div class="editor-layout">
+                    <div id="algo-editor" class="monaco-container border-glow"></div>
+                    <div class="console-output glass-panel">
+                        <h3>Output:</h3>
+                        <pre id="algo-output">Hệ thống sẵn sàng...</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: WEB BUILDER -->
+            <section id="webdev" class="tab-pane">
+                <header class="editor-header">
+                    <h2>Web Studio</h2>
+                    <button onclick="downloadWebCode()" class="btn btn-outline"><i class="fas fa-download"></i> Tải Code Web</button>
+                </header>
+                <div class="web-layout">
+                    <div class="web-editors">
+                        <div class="editor-col">
+                            <div class="col-title"><i class="fab fa-html5 text-orange"></i> HTML</div>
+                            <div id="html-editor" class="monaco-container"></div>
+                        </div>
+                        <div class="editor-col">
+                            <div class="col-title"><i class="fab fa-css3-alt text-blue"></i> CSS</div>
+                            <div id="css-editor" class="monaco-container"></div>
+                        </div>
+                        <div class="editor-col">
+                            <div class="col-title"><i class="fab fa-js text-yellow"></i> JS</div>
+                            <div id="js-editor" class="monaco-container"></div>
+                        </div>
+                    </div>
+                    <div class="web-preview glass-panel border-glow">
+                        <iframe id="live-preview"></iframe>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Tải Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.36.1/min/vs/loader.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
